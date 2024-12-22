@@ -1,7 +1,12 @@
 import requests
 import json
+import os
+from google.cloud import storage
 
-BASE_URI = "https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/teams?limit=32"
+# LOAD ENVIRONMENT VARIABLES
+BASE_URI = os.environ.get("BASE_URI", "Missing environment variable: BASE_URI")
+BUCKET_NAME = os.environ.get("BUCKET_NAME", "Missing environment variable: BUCKET_NAME")
+DATA_FILE_PATH = os.environ.get("DATA_FILE_PATH", "Missing environment variable: DATA_FILE_PATH")
 
 # HELPER FUNCTIONS
 def find_scoring_split(data):
@@ -13,12 +18,12 @@ def find_points_for(data):
 def find_points_against(data):
     return data["name"] == "pointsAgainst"
 
-# ENTRY POINT
-def update_scoring_stats():
+# PROCESSES
+def get_scoring_stats():
     team_list_req = requests.get(BASE_URI)
     team_list = team_list_req.json()
 
-    response = []
+    response = {}
 
     for team in team_list["items"]:
         team_data_req = requests.get(team["$ref"])
@@ -39,12 +44,20 @@ def update_scoring_stats():
             filter(find_points_against, scoring_split["stats"])
         )[0]["value"]
 
-        response.append({
-            "team": team_data["abbreviation"],
+        response[team_data["abbreviation"]] = {
             "points_for": points_for,
             "points_against": points_against,
-        })
+        }
 
     return response 
 
-print(update_scoring_stats())
+def upload_data(data):
+    client = storage.Client()
+    bucket = client.bucket(BUCKET_NAME)
+    blob = bucket.blob(DATA_FILE_PATH)
+    blob.upload_from_string(json.dumps(data), content_type="application/json")
+
+# ENTRY POINT
+def handle_request():
+    data = get_scoring_stats()
+    upload_data(data)
