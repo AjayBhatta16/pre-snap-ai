@@ -58,6 +58,6 @@ def upload_data(data):
     blob.upload_from_string(json.dumps(data), content_type="application/json")
 
 # ENTRY POINT
-def handle_request():
+def handle_request(*args):
     data = get_scoring_stats()
     upload_data(data)
